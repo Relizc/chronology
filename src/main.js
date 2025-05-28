@@ -9,13 +9,45 @@ class Game {
     this.keys = new Set();
 
     const canvas = document.getElementById("canvas");
+    this.canvas = canvas
     canvas.width = window.innerWidth;
     canvas.height = window.innerHeight;
-    this.canvas = canvas;
     this.ctx = canvas.getContext("2d");
+    window.addEventListener("resize", this.resize)
+    this.capture();
+  }
+
+  capture() {
+  document.onmousemove = (event) => {
+      var eventDoc, doc, body;
+
+      event = event || window.event; // IE-ism
+
+      // If pageX/Y aren't available and clientX/Y are,
+      // calculate pageX/Y - logic taken from jQuery.
+      // (This is to support old IE)
+      if (event.pageX == null && event.clientX != null) {
+        eventDoc = (event.target && event.target.ownerDocument) || document;
+        doc = eventDoc.documentElement;
+        body = eventDoc.body;
+
+        event.pageX =
+          event.clientX +
+          ((doc && doc.scrollLeft) || (body && body.scrollLeft) || 0) -
+          ((doc && doc.clientLeft) || (body && body.clientLeft) || 0);
+        event.pageY =
+          event.clientY +
+          ((doc && doc.scrollTop) || (body && body.scrollTop) || 0) -
+          ((doc && doc.clientTop) || (body && body.clientTop) || 0);
+      }
+
+      this.mousePos.x = event.pageX;
+      this.mousePos.y = event.pageY;
+    }
   }
 
   update() {
+    
     this.hz += 1;
 
     for (let sprites of this.sprites) {
@@ -35,9 +67,7 @@ class Game {
     this.rq += 1;
     this.draw();
 
-    requestAnimationFrame(() => {
-      this.animate();
-    });
+    requestAnimationFrame(() => {this.animate();});
   }
 
   draw() {
@@ -84,6 +114,10 @@ class Game {
   clear() {
     this.ctx.fillStyle = "black";
     this.ctx.fillRect(0, 0, canvas.width, canvas.height);
+  }
+  resize(){
+    this.canvas.width = window.innerWidth;
+    this.canvas.height = window.innerHeight;
   }
 }
 
@@ -162,28 +196,25 @@ class Room extends Sprite {
     super([gridSize[0] * 32, gridSize[1] * 32]);
     this.gridSize = gridSize;
 
-    this.floatAnimation = -1; // set to -1 to disable
+    //this.floatAnimation = -1; // set to -1 to disable
   }
 
   update() {
     super.update();
 
-    this.floatAnimation++;
+    // this.floatAnimation++;
 
-    let animation = (x) => {
-      return Math.floor(Math.sin(((2 * Math.PI) / 240) * x) * 5);
-    };
-    if (this.floatAnimation == 240) {
-      this.floatAnimation = 0;
-    }
+    // let animation = (x) => {
+    //   return Math.floor(Math.sin(((2 * Math.PI) / 240) * x) * 5);
+    // };
+    // if (this.floatAnimation == 240) {
+    //   this.floatAnimation = 0;
+    // }
 
     let relativeMouseX = event;
 
-    this.setX((Game.instance.canvas.width - this.getSizeX()) / 2);
-    this.setY(
-      (Game.instance.canvas.height - this.getSizeY()) / 2 +
-        animation(this.floatAnimation)
-    );
+    this.setX((Game.instance.canvas.width- this.getSizeX()) / 2);
+    this.setY((Game.instance.canvas.height - this.getSizeY()) / 2);
 
     //console.log(this, this.position)
     Game.instance.queueRender();
@@ -194,8 +225,8 @@ class Room extends Sprite {
 
     let orgPos = this.position;
 
-    this.setX(this.getX() + 10 * Math.random());
-    this.setY(this.getY() + 10 * Math.random());
+    this.setX(this.getX());
+    this.setY(this.getY());
 
     ctx.strokeStyle = "#999999";
     ctx.lineWidth = 12;
@@ -232,48 +263,28 @@ class Room extends Sprite {
     this.setY(orgPos[1]);
   }
 }
-
-game = new Game();
-Game.instance = game;
-Game.instance.animate();
-Game.instance.startShowingFps();
-Game.instance.startTicking();
-
-function capture() {
-  document.onmousemove = handleMouseMove;
-  function handleMouseMove(event) {
-    var eventDoc, doc, body;
-
-    event = event || window.event; // IE-ism
-
-    // If pageX/Y aren't available and clientX/Y are,
-    // calculate pageX/Y - logic taken from jQuery.
-    // (This is to support old IE)
-    if (event.pageX == null && event.clientX != null) {
-      eventDoc = (event.target && event.target.ownerDocument) || document;
-      doc = eventDoc.documentElement;
-      body = eventDoc.body;
-
-      event.pageX =
-        event.clientX +
-        ((doc && doc.scrollLeft) || (body && body.scrollLeft) || 0) -
-        ((doc && doc.clientLeft) || (body && body.clientLeft) || 0);
-      event.pageY =
-        event.clientY +
-        ((doc && doc.scrollTop) || (body && body.scrollTop) || 0) -
-        ((doc && doc.clientTop) || (body && body.clientTop) || 0);
-    }
-
-    Game.instance.mousePos.x = event.pageX;
-    Game.instance.mousePos.y = event.pageY;
+class Player extends Sprite {
+  constructor(){
+    super([16* 16])
+  }
+  draw(ctx){
+    super.draw();
+    ctx.strokeStyle = "#999999";
+    ctx.lineWidth = 12;
+    ctx.strokeRect(this.getX(), this.getY(), this.getSizeX(), this.getSizeY());
   }
 }
+game = new Game();
+Game.instance = game;
+game.animate();
+game.startShowingFps();
+game.startTicking();
 
-capture();
+
 
 sprite = new MomentumObject([8, 15]);
 
-room1 = new Room([8, 8]);
+room1 = new Room([16, 16]);
 
-window.addEventListener("keydown", (e) => Game.instance.keys.add(e.key));
+window.addEventListener("keydown", (e) => game.keys.add(e.key));
 window.addEventListener("keyup", (e) => Game.instance.keys.delete(e.key));
