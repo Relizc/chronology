@@ -56,8 +56,9 @@ class Vec2 {
 
 class Game {
   constructor() {
+    document.addEventListener('contextmenu', event => event.preventDefault());
     this.sprites = [];
-    this.mousePos = new Vec2(0, 0);
+    this.mousePos = new Vec2();
     this.frameUpdate = true;
     this.rq = 0;
     this.f = 0;
@@ -77,14 +78,11 @@ class Game {
   }
 
   capture() {
-  document.onmousemove = (event) => {
+    document.onmousemove = (event) => {
       var eventDoc, doc, body;
 
       event = event || window.event; // IE-ism
 
-      // If pageX/Y aren't available and clientX/Y are,
-      // calculate pageX/Y - logic taken from jQuery.
-      // (This is to support old IE)
       if (event.pageX == null && event.clientX != null) {
         eventDoc = (event.target && event.target.ownerDocument) || document;
         doc = eventDoc.documentElement;
@@ -140,7 +138,6 @@ class Game {
   }
 
   draw() {
-    
 
     if (!this.frameUpdate) return;
     this.f += 1;
@@ -212,7 +209,6 @@ class Game {
 class Sprite {
   constructor(hitbox) {
     this.hitbox = hitbox;
-    this.showHitbox = true;
     this.position = new Vec2(0, 0);
 
     this.floatAnimation = 0
@@ -222,41 +218,14 @@ class Sprite {
   } 
 
   draw(ctx) {
-
-    
     if (this.position.flippy()) Game.instance.queueRender()
-
   }
 
-  getX() {
-    return this.position[0];
-  }
 
-  getY() {
-    return this.position[1];
-  }
-
-  getSizeX() {
-    return this.hitbox[0];
-  }
-
-  getSizeY() {
-    return this.hitbox[1];
-  }
-
-  setX(value) {
-
-    if (this.position[0] == value) return;
-
-    this.position[0] = value;
-    Game.instance.queueRender()
-  }
-
-  setY(value) {
-
-    if (this.position[1] == value) return;
-
-    this.position[1] = value;
+  setPostion(x,y){
+    if (this.position[1] == x && this.position[0] == y) return;
+    this.position[0] = x;
+    this.position[1] = y;
     Game.instance.queueRender()
   }
 
@@ -282,7 +251,6 @@ class Room extends Sprite {
     super([gridSize[0] * 32, gridSize[1] * 32]);
     this.gridSize = gridSize;
 
-    //this.floatAnimation = -1; // set to -1 to disable
     this.characters = []
 
     this.mouseIn = false
@@ -298,29 +266,28 @@ class Room extends Sprite {
   }
 
   addCharacter(character) {
-    this.characters[0][0] = character
+    this.characters.push(character)
 
   }
 
   update() {
     super.update();
 
-    this.floatAnimation++;
+    // this.floatAnimation++;
 
-    let animation = (x) => {
-      return Math.floor(Math.sin(((2 * Math.PI) / 240) * x) * 5);
-    };
-    if (this.floatAnimation == 240) {
-      this.floatAnimation = 0;
-    }
+    // let animation = (x) => {
+    //   return Math.floor(Math.sin(((2 * Math.PI) / 240) * x) * 5);
+    // };
+    // if (this.floatAnimation == 240) {
+    //   this.floatAnimation = 0;
+    // }
 
-    let relativeMouseX = event;
+    // let relativeMouseX = event;
 
-    let delta = animation(this.floatAnimation)
+    // let delta = animation(this.floatAnimation)
 
-    this.setX((Game.instance.canvas.width- this.getSizeX()) / 2);
-    this.setY((Game.instance.canvas.height - this.getSizeY()) / 2 + delta);
-
+    this.setPostion((Game.instance.canvas.width- this.hitbox[0]) / 2,(Game.instance.canvas.height - this.hitbox[1]) / 2);
+  
     
     if (this.position.changed) {
       this.mouseMoved(Game.instance.mousePos)
@@ -343,12 +310,9 @@ class Room extends Sprite {
 
     let orgPos = this.position;
 
-    this.setX(this.getX());
-    this.setY(this.getY());
-
     ctx.strokeStyle = "#999999";
     ctx.lineWidth = 12;
-    ctx.strokeRect(this.getX(), this.getY(), this.getSizeX(), this.getSizeY());
+    ctx.strokeRect(this.position[0], this.position[1], this.hitbox[0], this.hitbox[1]);
 
     let color = false;
     let color2 = false;
@@ -360,8 +324,8 @@ class Room extends Sprite {
       }
 
       for (let j = 0; j < this.gridSize[1]; j++) {
-        let a = this.getX() + i * 32;
-        let b = this.getY() + j * 32;
+        let a = this.position[0] + i * 32;
+        let b = this.position[1] + j * 32;
 
         color = !color;
 
@@ -377,8 +341,7 @@ class Room extends Sprite {
       color2 = !color2;
     }
 
-    this.setX(orgPos[0]);
-    this.setY(orgPos[1]);
+    this.setPostion(orgPos[0],orgPos[1])
     
     if (this.mouseIn) this.mouseMoved(Game.instance.mousePos)
   }
@@ -387,10 +350,12 @@ class Room extends Sprite {
     //console.log("move")
     
     this.mouseIn = false
-    if (pos.x > this.position.x && pos.x < this.position.x + this.getSizeX()) {
-      if (pos.y > this.position.y && pos.y < this.position.y + this.getSizeY()) {
+    if (pos.x > this.position.x && pos.x < this.position.x + this.hitbox[0]) {
+      if (pos.y > this.position.y && pos.y < this.position.y + this.hitbox[1]) {
         this.mouseIn = true
+        window.addEventListener("click" , () => this.clickBoard(mx,my))
       }
+      
     }
 
     Game.instance.queueRender()
@@ -404,9 +369,20 @@ class Room extends Sprite {
     let mx = this.position.x + 32 * gridx;
     let my = this.position.y + 32 * gridy;
 
-    Game.instance.ctx.fillStyle = "rgba(255,255,255,0.6)"
+    Game.instance.ctx.fillStyle = "rgba(255,255,255,0.3)"
     Game.instance.ctx.fillRect(mx, my, 32, 32)
     
+    
+  }
+  
+  clickBoard(x, y){
+    this.characters.forEach(entity => {
+      if(entity instanceof Player){
+        entity.position[0] = x
+        entity.position[1] = y
+      }
+    });
+    Game.instance.queueRender()
   }
 }
 
@@ -415,14 +391,20 @@ class Player extends Sprite {
     super([32, 32])
 
   
-  }
+  } 
+  update(){
+    super.update();
+    if(Game.instance.keys["ArrowRight"]){
+      this.position[0]++
+    }
 
+  }
   draw(ctx){
     super.draw();
-    // ctx.strokeStyle = "#999999";
-    // ctx.lineWidth = 1;
-    // ctx.strokeRect(this.getX(), this.getY(), this.getSizeX(), this.getSizeY());
-    //Game.instance.queueRender()
+    let image = document.createElement("img")
+    image.src = "/public/player.png"
+    ctx.drawImage(image,this.position[0],this.position[1],32,32)
+
   }
 }
 game = new Game();
@@ -439,5 +421,5 @@ room1.addCharacter(dude)
 
 
 
-window.addEventListener("keydown", (e) => game.keys.add(e.key));
-window.addEventListener("keyup", (e) => Game.instance.keys.delete(e.key));
+window.addEventListener("keydown", (e) => game.keys[e.code] = true);
+window.addEventListener("keyup", (e) => delete Game.instance.keys[e.code]);
