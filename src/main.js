@@ -219,7 +219,7 @@ class Sprite {
 
     Game.instance.addSprite(this);
     Game.instance.queueRender();
-  }
+  } 
 
   draw(ctx) {
 
@@ -404,10 +404,8 @@ class Room extends Sprite {
     let mx = this.position.x + 32 * gridx;
     let my = this.position.y + 32 * gridy;
 
-    Game.instance.ctx.lineWidth = 1
-    Game.instance.ctx.strokeStyle = "#00FF00"
-    Game.instance.ctx.strokeRect(mx, my, 32, 32)
-
+    Game.instance.ctx.fillStyle = "rgba(255,255,255,0.6)"
+    Game.instance.ctx.fillRect(mx, my, 32, 32)
     
   }
 }
