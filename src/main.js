@@ -1,3 +1,51 @@
+const STYLES = {
+  tileDark: "#001324",
+  tileLight: "#032645"
+}
+
+
+class CubicBezier {
+  constructor(x1, y1, x2, y2) {
+    this.cx = 3 * x1;
+    this.bx = 3 * (x2 - x1) - this.cx;
+    this.ax = 1 - this.cx - this.bx;
+
+    this.cy = 3 * y1;
+    this.by = 3 * (y2 - y1) - this.cy;
+    this.ay = 1 - this.cy - this.by;
+  }
+
+  bezierCoord(a, b, c, t) {
+    return ((a * t + b) * t + c) * t;
+  }
+
+  bezierCoordDerivative(a, b, c, t) {
+    return (3 * a * t + 2 * b) * t + c;
+  }
+
+  solveT(x, epsilon = 1e-6) {
+    let t = x;
+    for (let i = 0; i < 10; i++) {
+      const xEstimate = this.bezierCoord(this.ax, this.bx, this.cx, t);
+      const dx = xEstimate - x;
+      if (Math.abs(dx) < epsilon) return t;
+      const dEstimate = this.bezierCoordDerivative(this.ax, this.bx, this.cx, t);
+      if (Math.abs(dEstimate) < epsilon) break;
+      t -= dx / dEstimate;
+    }
+    return t;
+  }
+
+  get(x) {
+    const t = this.solveT(x);
+    return this.bezierCoord(this.ay, this.by, this.cy, t);
+  }
+}
+
+
+
+
+
 class Vec2 {
 
   flippy() {
@@ -16,13 +64,17 @@ class Vec2 {
         return target[prop];
       },
       set(target, prop, value) {
+
         target.changed = true
 
         if (prop === '0') {
+        
+          //if (target.x != value) target.changed = true
           target.x = value;
           return true;
         }
         if (prop === '1') {
+          //if (target.y != value) target.changed = true
           target.y = value;
           return true;
         }
@@ -104,6 +156,8 @@ class Game {
   }
 
   update() {
+
+    let start = window.performance.now()
     
     this.hz += 1;
 
@@ -119,6 +173,10 @@ class Game {
         
       }
     }
+
+    let end = window.performance.now()
+
+    this.deltaTime = end- start
   }
 
 
@@ -180,7 +238,7 @@ class Game {
           " mp: " +
           this.mousePos.x +
           " " +
-          this.mousePos.y
+          this.mousePos.y + "\n"
       
       this.f = 0;
       this.rq = 0;
@@ -200,6 +258,18 @@ class Game {
     this.ctx.fillStyle = "black";
     this.ctx.fillRect(0, 0, canvas.width, canvas.height);
   }
+
+  onclick() {
+    for (let sprite of this.sprites) {
+      if (Game.instance.mousePos.x >= sprite.position.x && Game.instance.mousePos.x <= sprite.position.x + sprite.hitbox.x) {
+        if (Game.instance.mousePos.y >= sprite.position.y && Game.instance.mousePos.y <= sprite.position.y + sprite.hitbox.y) {
+          sprite.onclick()
+        }
+      }
+      
+    }
+  }
+
   resize(){
     this.canvas.width = window.innerWidth;
     this.canvas.height = window.innerHeight;
@@ -208,10 +278,11 @@ class Game {
 
 class Sprite {
   constructor(hitbox) {
-    this.hitbox = hitbox;
+    this.hitbox = new Vec2(hitbox[0], hitbox[1]);
     this.position = new Vec2(0, 0);
 
     this.floatAnimation = 0
+
 
     Game.instance.addSprite(this);
     Game.instance.queueRender();
@@ -223,7 +294,7 @@ class Sprite {
 
 
   setPostion(x,y){
-    if (this.position[1] == x && this.position[0] == y) return;
+    if (this.position[0] == x && this.position[1] == y) return;
     this.position[0] = x;
     this.position[1] = y;
     Game.instance.queueRender()
@@ -232,6 +303,8 @@ class Sprite {
   update() {}
 
   mouseMoved(pos) {}
+
+  onclick() {}
 
   _drawHitbox(ctx) {
     //console.log(1);
@@ -263,30 +336,39 @@ class Room extends Sprite {
     for (let i = 0; i < gridSize[0]; i ++) {
       this.characters.push(propogate.slice())
     }
+
+
+    this.selection = new Vec2(0, 0)
+    this.selectionMode = "pickingCharacter"
   }
 
   addCharacter(character) {
-    this.characters.push(character)
+    this.characters[0][0] = character
 
   }
 
   update() {
     super.update();
 
-    // this.floatAnimation++;
+    this.floatAnimation++;
 
-    // let animation = (x) => {
-    //   return Math.floor(Math.sin(((2 * Math.PI) / 240) * x) * 5);
-    // };
-    // if (this.floatAnimation == 240) {
-    //   this.floatAnimation = 0;
-    // }
+    let animation = (x) => {
+      return Math.floor(Math.sin(((2 * Math.PI) / 240) * x) * 5);
+    };
+    if (this.floatAnimation == 240) {
+      this.floatAnimation = 0;
+    }
 
-    // let relativeMouseX = event;
+    let relativeMouseX = event;
 
-    // let delta = animation(this.floatAnimation)
+    let delta = animation(this.floatAnimation)
 
-    this.setPostion((Game.instance.canvas.width- this.hitbox[0]) / 2,(Game.instance.canvas.height - this.hitbox[1]) / 2);
+    
+
+    this.setPostion((Game.instance.canvas.width- this.hitbox[0]) / 2,(Game.instance.canvas.height - this.hitbox[1]) / 2 + delta);
+
+    //this.position.y = this.position.y + delta
+    //console.log(this.position.y)
   
     
     if (this.position.changed) {
@@ -309,6 +391,61 @@ class Room extends Sprite {
     super.draw();
 
     let orgPos = this.position;
+
+    ctx.fillStyle = "#00FF00"
+    ctx.font = "16px Courier"
+    ctx.textAlign = "center"
+    
+    if (this.selectionMode == "pickingCharacter") {
+      ctx.fillText("Pick a character to move!", this.position.x + this.hitbox.x / 2, this.position.y - 16)
+    } else if (this.selectionMode == "pickedCharacter") {
+      ctx.fillStyle = "rgb(255, 238, 0)"  
+      ctx.fillText("Moving this dude?", this.position.x + this.hitbox.x / 2, this.position.y - 16)
+    }
+
+    if (this.selectionMode == "pickedCharacter") {
+      this._slideButtonAnimation += 0.01
+      this._slideButtonAnimation = Math.min(1, this._slideButtonAnimation)
+      if (this._slideButtonAnimation != 1) Game.instance.queueRender()
+      let buttondelta = new CubicBezier(0.42, 0, 0.58, 1).get(this._slideButtonAnimation) * 80
+      
+      let ifndef = (j, k) => {
+        if (Game.instance.mousePos.x >= j) {
+          if (Game.instance.mousePos.x <= j + 64) {
+            if (Game.instance.mousePos.y >= k) {
+              if (Game.instance.mousePos.y <= k + 32) {
+                return STYLES.tileLight;
+              }
+            }
+          }
+        }
+        return "#001324";
+      }
+
+      ctx.fillStyle = ifndef(this.position.x + (this.hitbox.x) / 2 - 32 - 50, this.position.y + this.hitbox.y - 50 + buttondelta)
+      ctx.strokeStyle = "#999"
+      ctx.lineWidth = 2
+      ctx.fillRect(this.position.x + (this.hitbox.x) / 2 - 32 - 50, this.position.y + this.hitbox.y - 50 + buttondelta, 64, 32)
+      ctx.strokeRect(this.position.x + (this.hitbox.x) / 2 - 32 - 50, this.position.y + this.hitbox.y - 50 + buttondelta, 64, 32)
+
+      ctx.fillStyle = "#00FF00"
+      ctx.textBaseline = "middle"
+      ctx.fillText("Sure", this.position.x + (this.hitbox.x) / 2 - 50, this.position.y + this.hitbox.y - 50 + 16 + buttondelta)
+      ctx.fillStyle = ifndef(this.position.x + (this.hitbox.x) / 2 - 32 + 50, this.position.y + this.hitbox.y - 50 + buttondelta)
+
+      
+
+      ctx.fillRect(this.position.x + (this.hitbox.x) / 2 - 32 + 50, this.position.y + this.hitbox.y - 50 + buttondelta, 64, 32)
+      ctx.strokeRect(this.position.x + (this.hitbox.x) / 2 - 32 + 50, this.position.y + this.hitbox.y - 50 + buttondelta, 64, 32)
+
+      ctx.fillStyle = "#FF0000"
+      ctx.textBaseline = "middle"
+      ctx.fillText("Nah", this.position.x + (this.hitbox.x) / 2 + 50, this.position.y + this.hitbox.y - 50 + 16 + buttondelta)
+      //ctx.fillStyle = ifndef()
+      ctx.textBaseline = "alphabetic"
+    }
+
+    ctx.textAlign = "left"
 
     ctx.strokeStyle = "#999999";
     ctx.lineWidth = 12;
@@ -342,9 +479,19 @@ class Room extends Sprite {
     }
 
     this.setPostion(orgPos[0],orgPos[1])
+
+    if (this.selectionMode == "pickedCharacter") {
+      ctx.fillStyle = "rgba(255, 251, 0, 0.5)"
+    } else {
+      ctx.fillStyle = "rgba(0, 255, 0, 0.5)"
+    }
+    ctx.fillRect(this.selection.x * 32 + this.position.x, this.selection.y * 32 + this.position.y, 32, 32)
+
     
     if (this.mouseIn) this.mouseMoved(Game.instance.mousePos)
   }
+
+
 
   mouseMoved(pos) {
     //console.log("move")
@@ -353,7 +500,7 @@ class Room extends Sprite {
     if (pos.x > this.position.x && pos.x < this.position.x + this.hitbox[0]) {
       if (pos.y > this.position.y && pos.y < this.position.y + this.hitbox[1]) {
         this.mouseIn = true
-        window.addEventListener("click" , () => this.clickBoard(mx,my))
+        
       }
       
     }
@@ -374,14 +521,33 @@ class Room extends Sprite {
     
     
   }
+
+  onclick() {
+    this.clickBoard(Game.instance.mousePos.x, Game.instance.mousePos.y)
+  }
   
   clickBoard(x, y){
-    this.characters.forEach(entity => {
-      if(entity instanceof Player){
-        entity.position[0] = x
-        entity.position[1] = y
+
+    x = Math.floor((x - this.position.x) / 32)
+    y = Math.floor((y - this.position.y) / 32)
+
+    if (this.selectionMode == "pickingCharacter") {
+      this.selection.x = x
+      this.selection.y = y
+      Game.instance.queueRender()
+
+      if (this.characters[x][y] instanceof Player) {
+        this.selectionMode = "pickedCharacter"
+        
+        this._slideButtonAnimation = 0
       }
-    });
+    }
+
+    
+
+    
+
+
     Game.instance.queueRender()
   }
 }
@@ -394,10 +560,6 @@ class Player extends Sprite {
   } 
   update(){
     super.update();
-    if(Game.instance.keys["ArrowRight"]){
-      this.position[0]++
-    }
-
   }
   draw(ctx){
     super.draw();
@@ -416,10 +578,11 @@ game.startTicking();
 room1 = new Room([16, 16]);
 
 dude = new Player();
-dude.drawHitbox = true
+dude.drawHitbox = false
 room1.addCharacter(dude)
 
 
 
 window.addEventListener("keydown", (e) => game.keys[e.code] = true);
 window.addEventListener("keyup", (e) => delete Game.instance.keys[e.code]);
+window.addEventListener("click" , () => Game.instance.onclick())
